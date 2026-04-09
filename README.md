@@ -1,6 +1,7 @@
 # VaultShield: Secure Android 2FA Authenticator
 
 VaultShield is a project demonstrating a hardened Android TOTP (RFC 6238) authenticator. It prioritizes data integrity, local-first security, and resistance to common mobile attack vectors.
+     ![VaultShield](screenshots/homecreen.png)
 
 ## Security Architecture Highlights
 
@@ -36,6 +37,7 @@ VaultShield implements a strict architectural boundary between sensitive secrets
 In this demo, the **Security Audit Log** is user-visible to demonstrate the capture of sensitive events.
 - **Production Hardening**: Uses `BuildConfig.DEBUG` checks to redact detailed technical metadata (e.g., specific Account IDs or Issuer names) in production builds, ensuring the audit trail itself doesn't become a source of sensitive information leakage.
 - **Enterprise Deployment Note**: In a production environment, these logs would typically be offloaded to a secure remote SIEM or kept in protected partitions for forensic auditors.
+     ![Audit Logs](screenshots/auditscreen.png)
 
 ### Environment Integrity
 The app performs **runtime checks** for:
