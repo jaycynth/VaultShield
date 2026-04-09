@@ -1,5 +1,6 @@
 package com.techne.vaultshield.ui.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.techne.vaultshield.domain.model.OtpAccount
 import com.techne.vaultshield.security.TotpGenerator
 import com.techne.vaultshield.ui.audit.AuditLogScreen
@@ -29,6 +32,17 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     auditViewModel: AuditViewModel = hiltViewModel()
 ) {
+    var showAddAccountSheet by remember { mutableStateOf(false) }
+
+    val scanLauncher = rememberLauncherForActivityResult(
+        contract = ScanContract(),
+        onResult = { result ->
+            result.contents?.let {
+                onIntent(HomeIntent.ProcessQrCode(it))
+            }
+        }
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -50,7 +64,7 @@ fun HomeScreen(
         },
         floatingActionButton = {
             if (state.isAuthenticated && !state.isAuditVisible) {
-                FloatingActionButton(onClick = onAddClick) {
+                FloatingActionButton(onClick = { showAddAccountSheet = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Add Account")
                 }
             }
@@ -73,6 +87,90 @@ fun HomeScreen(
                     AuditLogScreen(auditState.auditLogs)
                 } else {
                     AccountList(state.accounts, onIntent)
+                }
+            }
+        }
+
+        if (showAddAccountSheet) {
+            AddAccountBottomSheet(
+                onDismiss = { showAddAccountSheet = false },
+                onAddManual = { issuer, name, secret ->
+                    onIntent(HomeIntent.AddAccountManual(issuer, name, secret))
+                    showAddAccountSheet = false
+                },
+                onScanQr = {
+                    val options = ScanOptions()
+                    options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                    options.setPrompt("Scan a TOTP QR Code")
+                    options.setBeepEnabled(false)
+                    options.setOrientationLocked(false)
+                    scanLauncher.launch(options)
+                    showAddAccountSheet = false
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddAccountBottomSheet(
+    onDismiss: () -> Unit,
+    onAddManual: (String, String, String) -> Unit,
+    onScanQr: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    var isManualEntry by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp, start = 16.dp, end = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Add New Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (!isManualEntry) {
+                Button(
+                    onClick = onScanQr,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Scan QR Code")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { isManualEntry = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Enter Manually")
+                }
+            } else {
+                var issuer by remember { mutableStateOf("") }
+                var accountName by remember { mutableStateOf("") }
+                var secret by remember { mutableStateOf("") }
+
+                OutlinedTextField(value = issuer, onValueChange = { issuer = it }, label = { Text("Issuer (e.g. Google)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = accountName, onValueChange = { accountName = it }, label = { Text("Account Name (e.g. email)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = secret, onValueChange = { secret = it }, label = { Text("Secret Key (Base32)") }, modifier = Modifier.fillMaxWidth())
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = { onAddManual(issuer, accountName, secret) },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    enabled = issuer.isNotBlank() && secret.isNotBlank()
+                ) {
+                    Text("Add Account")
                 }
             }
         }

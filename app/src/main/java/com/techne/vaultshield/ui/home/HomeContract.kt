@@ -20,6 +20,8 @@ sealed class HomeIntent {
     data class CopyOtp(val account: OtpAccount) : HomeIntent()
     object Authenticate : HomeIntent()
     object AddAccount : HomeIntent()
+    data class AddAccountManual(val issuer: String, val accountName: String, val secret: String) : HomeIntent()
+    data class ProcessQrCode(val qrContent: String) : HomeIntent()
     object LockVault : HomeIntent()
     object ToggleAudit : HomeIntent()
     object CreateBackup : HomeIntent()

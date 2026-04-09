@@ -19,22 +19,30 @@ VaultShield maps concrete mobile threats to specific technical mitigations:
 
 ## Technical Implementation
 
-### Data Protection & Storage
-VaultShield uses a defense-in-depth storage model:
-- **Secrets & Metadata**: Stored using `EncryptedSharedPreferences` within the application sandbox. Keys are managed via the Android Keystore, utilizing the **TEE (Trusted Execution Environment)** or **StrongBox** hardware where available.
-- **Backup Security**: Implements a **client-side encrypted backup flow**. Keys are derived via **PBKDF2WithHmacSHA256** (65,536 iterations + 16-byte salt) and data is encrypted with **AES-256 GCM**.
+### Data Protection & Storage (Model Distinction)
+VaultShield implements a strict architectural boundary between sensitive secrets and non-sensitive metadata to enhance both performance and security:
+
+1. **Metadata Storage (Room Database)**:
+   - **What**: Account labels, issuers, and display preferences.
+   - **Why**: Stored in a local relational database (Room) to allow for efficient querying, sorting, and UI updates. This prevents the performance bottleneck of decrypting hardware-backed storage just to render a list of account names.
+   
+2. **Secret Isolation (Hardware-Backed Keystore)**:
+   - **What**: The raw Base32 TOTP secrets.
+   - **Why**: Isolated in `EncryptedSharedPreferences`. By using the **Android Keystore**, keys are managed in the **TEE (Trusted Execution Environment)** or **StrongBox**, making them inaccessible even to a compromised OS. Secrets are only "pulled" using the Room ID as a lookup key at the exact moment of TOTP generation.
+   
+3. **Security Benefit**: This separation adheres to the **Principle of Least Privilege**. Even if a vulnerability allowed unauthorized access to the Room database, the attacker would gain no cryptographic material, as the raw secrets are protected by an independent, hardware-rooted layer.
 
 ### Security Audit System (Forensics)
 In this demo, the **Security Audit Log** is user-visible to demonstrate the capture of sensitive events.
-- **Enterprise Deployment Note**: In a production environment, these logs would typically be non-user-facing and offloaded to a secure remote SIEM or kept in protected partitions for forensic auditors.
-- **Efficiency**: Implements a circular buffer (100 entries) to prevent unbounded storage and memory consumption.
+- **Production Hardening**: Uses `BuildConfig.DEBUG` checks to redact detailed technical metadata (e.g., specific Account IDs or Issuer names) in production builds, ensuring the audit trail itself doesn't become a source of sensitive information leakage.
+- **Enterprise Deployment Note**: In a production environment, these logs would typically be offloaded to a secure remote SIEM or kept in protected partitions for forensic auditors.
 
 ### Environment Integrity
 The app performs **runtime checks** for:
 - **Root/Tamper**: Basic detection via `RootBeer` and build-property analysis.
 - **Emulators**: Checking for known virtualized hardware signals.
 - **Debuggers**: Detection of attached JDWP debuggers.
-*Note: These are defensive signals and, while robust, are not a 100% guarantee against sophisticated kernel-level hooks.*
+- **Signal vs. Guarantee**: These are **defensive signals** intended to increase the cost of an attack. They are not a 100% guarantee against sophisticated kernel-level hooks or advanced persistent threats (APTs).
 
 ## Verification & Testing
 - **Unit Tests**: `TotpGeneratorTest` validates HMAC-SHA1 output against RFC vectors.
@@ -50,9 +58,10 @@ VaultShield targets **MASVS-L2** (Standard Security + Defense-in-Depth):
 
 ## Technical Stack
 - **Kotlin & Jetpack Compose**: Modern, reactive UI.
+- **Room Persistence**: Efficient metadata management.
 - **Dagger Hilt**: Dependency injection for clean, testable architecture.
-- **AndroidX Security & Biometric**: Uses AndroidX security APIs backed by platform keystore where available.
-- **OkHttp**: Configured with Certificate Pinning for network resilience.
+- **AndroidX Security & Biometric**: Hardware-backed cryptographic APIs.
+- **OkHttp**: Configured with **Certificate Pinning** (reserved for future sync functionality) to maintain network resilience.
 
 ## Limitations
 1. **OS Compromise**: Sophisticated kernel-level spyware may bypass user-space integrity checks.

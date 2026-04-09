@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.techne.vaultshield"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.techne.vaultshield"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -38,6 +38,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -56,6 +57,11 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
 
     // Security
     implementation(libs.androidx.security.crypto)

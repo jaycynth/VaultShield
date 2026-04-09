@@ -14,6 +14,7 @@ import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 import androidx.core.content.edit
+import com.techne.vaultshield.BuildConfig
 
 @Singleton
 class AuditLogRepositoryImpl @Inject constructor(
@@ -41,7 +42,13 @@ class AuditLogRepositoryImpl @Inject constructor(
     override fun getLogs(): Flow<List<AuditLog>> = _logs.asStateFlow()
 
     override suspend fun logAction(action: String, details: String) {
-        val newLog = AuditLog(System.currentTimeMillis(), action, details)
+        val sanitizedDetails = if (BuildConfig.DEBUG) {
+            details
+        } else {
+            "Action performed by user (Details redacted in Production)"
+        }
+
+        val newLog = AuditLog(System.currentTimeMillis(), action, sanitizedDetails)
         val current = _logs.value.toMutableList()
         current.add(0, newLog) // Add to top
         if (current.size > 100) current.removeAt(current.size - 1) // Keep last 100

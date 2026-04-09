@@ -1,6 +1,6 @@
 package com.techne.vaultshield.security
 
-import android.util.Base64
+import org.apache.commons.codec.binary.Base64
 import java.security.SecureRandom
 import java.security.spec.KeySpec
 import javax.crypto.Cipher
@@ -37,14 +37,14 @@ object EncryptionManager {
         val encryptedData = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
         
         val combined = salt + iv + encryptedData
-        return Base64.encodeToString(combined, Base64.NO_WRAP)
+        return Base64.encodeBase64String(combined)
     }
 
     /**
      * Decrypts data using a password-derived key.
      */
     fun decryptWithPassword(encryptedBase64: String, password: CharArray): String {
-        val combined = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+        val combined = Base64.decodeBase64(encryptedBase64)
         
         val salt = combined.sliceArray(0 until SALT_LENGTH_BYTE)
         val iv = combined.sliceArray(SALT_LENGTH_BYTE until SALT_LENGTH_BYTE + IV_LENGTH_BYTE)

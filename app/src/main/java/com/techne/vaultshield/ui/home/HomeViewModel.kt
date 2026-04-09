@@ -1,5 +1,6 @@
 package com.techne.vaultshield.ui.home
 
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techne.vaultshield.domain.model.OtpRepository
@@ -33,7 +34,7 @@ class HomeViewModel @Inject constructor(
     val state: StateFlow<HomeState> = _state.asStateFlow()
 
     private var sessionTimeoutJob: Job? = null
-    private val SESSION_TIMEOUT_MS = 5 * 60 * 1000L // 5 minutes
+    private val sessionTimeoutMs = 5 * 60 * 1000L // 5 minutes
 
     init {
         checkSecurity()
@@ -78,6 +79,18 @@ class HomeViewModel @Inject constructor(
                     auditLogRepository.logAction("REVEAL_ACCOUNT", "Account ID: ${intent.id}")
                 }
             }
+            is HomeIntent.CopyOtp -> {
+                viewModelScope.launch {
+                    val otp = TotpGenerator.generateTotp(
+                        secret = intent.account.secret,
+                        period = intent.account.period,
+                        digits = intent.account.digits,
+                        algorithm = intent.account.algorithm
+                    )
+                    clipboardManager.copyToClipboard("${intent.account.issuer} OTP", otp)
+                    auditLogRepository.logAction("COPY_OTP", "Issuer: ${intent.account.issuer}")
+                }
+            }
             is HomeIntent.Authenticate -> {
                 _state.update { it.copy(isAuthenticated = true) }
                 viewModelScope.launch {
@@ -96,11 +109,46 @@ class HomeViewModel @Inject constructor(
                     auditLogRepository.logAction("ADD_ACCOUNT", "Issuer: ${newAccount.issuer}")
                 }
             }
-            is HomeIntent.CopyOtp -> {
-                val otp = TotpGenerator.generateTotp(intent.account.secret)
-                clipboardManager.copyToClipboard("OTP Code", otp)
+            is HomeIntent.AddAccountManual -> {
                 viewModelScope.launch {
-                    auditLogRepository.logAction("COPY_OTP", "Account: ${intent.account.issuer}")
+                    val newAccount = OtpAccount(
+                        id = UUID.randomUUID().toString(),
+                        issuer = intent.issuer,
+                        accountName = intent.accountName,
+                        secret = intent.secret
+                    )
+                    repository.addAccount(newAccount)
+                    auditLogRepository.logAction("ADD_ACCOUNT_MANUAL", "Issuer: ${newAccount.issuer}")
+                }
+            }
+            is HomeIntent.ProcessQrCode -> {
+                viewModelScope.launch {
+                    try {
+                        val uri = intent.qrContent.toUri()
+                        if (uri.scheme == "otpauth" && uri.host == "totp") {
+                            val label = uri.path?.removePrefix("/") ?: "Unknown"
+                            val issuer = uri.getQueryParameter("issuer") ?: label.split(":").firstOrNull() ?: "Unknown"
+                            val accountName = if (label.contains(":")) label.split(":")[1] else label
+                            val secret = uri.getQueryParameter("secret")
+                            
+                            if (secret != null) {
+                                val newAccount = OtpAccount(
+                                    id = UUID.randomUUID().toString(),
+                                    issuer = issuer,
+                                    accountName = accountName,
+                                    secret = secret
+                                )
+                                repository.addAccount(newAccount)
+                                auditLogRepository.logAction("SCAN_QR_SUCCESS", "Issuer: $issuer")
+                            } else {
+                                _state.update { it.copy(error = "Invalid QR: Missing secret") }
+                            }
+                        } else {
+                            _state.update { it.copy(error = "Invalid QR: Not a TOTP code") }
+                        }
+                    } catch (_: Exception) {
+                        _state.update { it.copy(error = "QR Processing Error") }
+                    }
                 }
             }
             is HomeIntent.LockVault -> {
@@ -117,7 +165,7 @@ class HomeViewModel @Inject constructor(
             }
             is HomeIntent.CreateBackup -> {
                 viewModelScope.launch {
-                    val backupData = backupManager.createEncryptedBackup("secure-backup-pass".toCharArray())
+                    backupManager.createEncryptedBackup("secure-backup-pass".toCharArray())
                     auditLogRepository.logAction("EXPORT_BACKUP", "Encrypted backup created")
                     _state.update { it.copy(error = "Backup Created") }
                 }
@@ -138,7 +186,7 @@ class HomeViewModel @Inject constructor(
     private fun resetSessionTimeout() {
         sessionTimeoutJob?.cancel()
         sessionTimeoutJob = viewModelScope.launch {
-            delay(SESSION_TIMEOUT_MS)
+            delay(sessionTimeoutMs)
             handleIntent(HomeIntent.LockVault)
         }
     }
