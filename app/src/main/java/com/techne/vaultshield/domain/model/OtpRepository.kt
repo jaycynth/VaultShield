@@ -1,6 +1,5 @@
-package com.techne.vaultshield.data.repository
+package com.techne.vaultshield.domain.model
 
-import com.techne.vaultshield.domain.model.OtpAccount
 import kotlinx.coroutines.flow.Flow
 
 interface OtpRepository {

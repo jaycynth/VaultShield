@@ -1,7 +1,7 @@
 package com.techne.vaultshield.di
 
 import com.techne.vaultshield.data.audit.AuditLogRepositoryImpl
-import com.techne.vaultshield.data.repository.OtpRepository
+import com.techne.vaultshield.domain.model.OtpRepository
 import com.techne.vaultshield.data.repository.OtpRepositoryImpl
 import com.techne.vaultshield.domain.audit.AuditLogRepository
 import dagger.Binds

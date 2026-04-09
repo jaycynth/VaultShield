@@ -1,6 +1,6 @@
 package com.techne.vaultshield.security
 
-import com.techne.vaultshield.data.repository.OtpRepository
+import com.techne.vaultshield.domain.model.OtpRepository
 import com.techne.vaultshield.domain.model.OtpAccount
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray

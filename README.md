@@ -1,67 +1,62 @@
-# VaultShield: Android 2FA Authenticator
+# VaultShield: Secure Android 2FA Authenticator
 
-VaultShield is a production-grade Android 2FA application designed to demonstrate advanced mobile security engineering. It implements industry-standard TOTP (RFC 6238) while enforcing a multi-layered defense-in-depth strategy.
+VaultShield is a project demonstrating a hardened Android TOTP (RFC 6238) authenticator. It prioritizes data integrity, local-first security, and resistance to common mobile attack vectors.
 
 ## Security Architecture Highlights
 
-VaultShield maps major mobile threats to concrete technical mitigations:
+VaultShield maps concrete mobile threats to specific technical mitigations:
 
-| Threat Category | Mitigation Control | Implementation Details |
+| Threat Scenario | Mitigation Control | Implementation Details |
 | :--- | :--- | :--- |
-| **Credential Theft** | Hardware-Backed Encryption | `EncryptedSharedPreferences` (AES-256 GCM) with keys in Android TEE. |
-| **Unauthorized Access** | Biometric Gating | Mandatory `BiometricPrompt` for vault entry and per-account reveal. |
-| **Tapjacking** | Anti-Overlay Protection | `HIDE_OVERLAY_WINDOWS` (Android 12+) to block malicious overlays. |
-| **Screen Scraping** | Prevent Capture | `FLAG_SECURE` blocks screenshots and screen recording. |
-| **Clipboard Sniffing** | Secure Clipboard Manager | Automatic 30-second clipboard clearing. |
-| **Environment Risk** | Integrity Monitoring | Real-time detection of Root, Emulators, and Debuggers. |
-| **Insecure Backup** | End-to-End Encryption | Password-based key derivation (PBKDF2) + AES-GCM for exports. |
-| **Repudiation** | Security Audit Log | Secure local logging of all sensitive state changes and access events. |
+| **Physical Access / Theft** | Biometric Gating | Mandatory `BiometricPrompt` for vault entry and per-account secret reveal. |
+| **Data Extraction / Root Dump** | Authenticated Encryption | `EncryptedSharedPreferences` (AES-256 GCM) with keys in Android Keystore (Hardware-backed where supported). |
+| **Overlay / Tapjacking** | UI Hardening | `HIDE_OVERLAY_WINDOWS` (Android 12+) to block malicious screen overlays. |
+| **Screen Scraping / Recents** | Prevent Capture | `FLAG_SECURE` to block screenshots and screen recording. |
+| **Clipboard Sniffing** | Secure Clipboard | Custom manager with a 30-second auto-clear timer for OTP codes. |
+| **Compromised Environment** | Runtime Integrity Checks | Periodic checks for Root (RootBeer), Emulators, and active Debuggers. |
+| **Malicious Backups** | Encrypted Export | Client-side password-based key derivation (PBKDF2) + AES-GCM for exports. |
+| **Internal Repudiation** | Forensic Audit Log | Secure local logging of sensitive state changes (e.g., secret reveal, export). |
 
-## Feature Deep Dive: Security Audit & Forensics
+## Technical Implementation
 
-Unlike standard authenticators, VaultShield implements a **Security Audit Log** system. While the logs are visible in the app for user transparency, their primary purpose in a real-world high-security scenario is **Forensic Analysis**.
+### Data Protection & Storage
+VaultShield uses a defense-in-depth storage model:
+- **Secrets & Metadata**: Stored using `EncryptedSharedPreferences` within the application sandbox. Keys are managed via the Android Keystore, utilizing the **TEE (Trusted Execution Environment)** or **StrongBox** hardware where available.
+- **Backup Security**: Implements a **client-side encrypted backup flow**. Keys are derived via **PBKDF2WithHmacSHA256** (65,536 iterations + 16-byte salt) and data is encrypted with **AES-256 GCM**.
 
-- **Transparency**: Users can monitor when their secrets were added, deleted, or revealed.
-- **Forensics**: In the event of a device compromise, these logs provide a tamper-evident record of activity, helping security teams understand the scope of a breach.
-- **MASVS Compliance**: Addresses **MASVS-L2** requirements for logging and monitoring (M10: Insufficient Logging & Monitoring).
+### Security Audit System (Forensics)
+In this demo, the **Security Audit Log** is user-visible to demonstrate the capture of sensitive events.
+- **Enterprise Deployment Note**: In a production environment, these logs would typically be non-user-facing and offloaded to a secure remote SIEM or kept in protected partitions for forensic auditors.
+- **Efficiency**: Implements a circular buffer (100 entries) to prevent unbounded storage and memory consumption.
 
-## Secure Backup & Recovery
+### Environment Integrity
+The app performs **runtime checks** for:
+- **Root/Tamper**: Basic detection via `RootBeer` and build-property analysis.
+- **Emulators**: Checking for known virtualized hardware signals.
+- **Debuggers**: Detection of attached JDWP debuggers.
+*Note: These are defensive signals and, while robust, are not a 100% guarantee against sophisticated kernel-level hooks.*
 
-VaultShield implements a zero-knowledge backup system:
-- **Client-Side Encryption**: Data is encrypted *before* it leaves the application sandbox.
-- **Key Derivation**: Uses **PBKDF2WithHmacSHA256** with 65,536 iterations and a unique salt.
-- **Authenticated Encryption**: Uses **AES-256 GCM** to ensure the backup payload cannot be tampered with without detection.
-
-## Project Structure & Documentation
-
-This repository is designed to be a "Security Portfolio" piece:
-
-- **[Threat Model](docs/threat-model.md)**: STRIDE analysis and risk assessment.
-- **[Architecture](docs/architecture.md)**: Data flow, trust boundaries, and cryptographic details.
-- **[Attack Surface](docs/attack-surface.md)**: Analysis of entry points and vectors.
-- **[Security Tests](docs/security-tests.md)**: Plan for verifying defensive controls.
+## Verification & Testing
+- **Unit Tests**: `TotpGeneratorTest` validates HMAC-SHA1 output against RFC vectors.
+- **Security Tests**: See [docs/security-tests.md](docs/security-tests.md) for manual validation procedures for biometric gating and screenshot prevention.
 
 ## OWASP MASVS Mapping
-
-VaultShield targets **MASVS-L2** compliance:
-- **MSTG-STORAGE-1/2**: Sensitive data stored in encrypted local storage using secure platform APIs.
-- **MSTG-AUTH-1**: Biometric authentication enforced for all sensitive state transitions.
-- **MSTG-CRYPTO-1**: Uses strong, industry-standard cryptographic primitives (AES-GCM, PBKDF2).
-- **MSTG-PLATFORM-2**: Implements `FLAG_SECURE` and Anti-Overlay protection.
-- **MSTG-RESILIENCE-1**: Integrated root and debugger detection.
+VaultShield targets **MASVS-L2** (Standard Security + Defense-in-Depth):
+- **MSTG-STORAGE-1**: Sensitive data never stored in plaintext.
+- **MSTG-AUTH-1**: Biometrics enforced for all sensitive state transitions.
+- **MSTG-CRYPTO-1**: Industry-standard primitives (AES-GCM, PBKDF2).
+- **MSTG-PLATFORM-2**: Implements `FLAG_SECURE` and Anti-Overlay.
+- **MSTG-RESILIENCE-1**: Multi-layered environment detection.
 
 ## Technical Stack
 - **Kotlin & Jetpack Compose**: Modern, reactive UI.
 - **Dagger Hilt**: Dependency injection for clean, testable architecture.
-- **AndroidX Security & Biometric**: Direct interface with hardware security modules.
+- **AndroidX Security & Biometric**: Uses AndroidX security APIs backed by platform keystore where available.
 - **OkHttp**: Configured with Certificate Pinning for network resilience.
 
-## What VaultShield Does Not Protect Against
-
-1. **Sophisticated OS-Level Hooks**: High-end spyware with kernel-level access may bypass user-space root detection.
-2. **Compromised Keystore**: If the OS itself is compromised, hardware-backed keys can still be abused if the authentication is bypassed.
-3. **User Password Strength**: Backup security relies on the complexity of the user's chosen password.
-4. **Physical Coercion**: Security controls are bypassed if a user is physically forced to authenticate.
+## Limitations
+1. **OS Compromise**: Sophisticated kernel-level spyware may bypass user-space integrity checks.
+2. **User Password**: The security of portable backups is bound by the complexity of the user's chosen password.
+3. **Physical Coercion**: Biometric controls do not protect against a user being physically forced to unlock the device.
 
 ---
-*Developed as a demonstration of Mobile Security Engineering proficiency.*

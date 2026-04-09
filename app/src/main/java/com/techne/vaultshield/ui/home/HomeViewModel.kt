@@ -2,7 +2,7 @@ package com.techne.vaultshield.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.techne.vaultshield.data.repository.OtpRepository
+import com.techne.vaultshield.domain.model.OtpRepository
 import com.techne.vaultshield.domain.audit.AuditLogRepository
 import com.techne.vaultshield.domain.model.OtpAccount
 import com.techne.vaultshield.security.BackupManager
